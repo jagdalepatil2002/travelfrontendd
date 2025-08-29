@@ -66,33 +66,43 @@ document.addEventListener('DOMContentLoaded', () => {
             utterance.pitch = 1.0;
             utterance.volume = 0.8;
             
-            // Try to use a specific voice (prioritize female voices)
+            // Use Molly voice specifically
             const voices = window.speechSynthesis.getVoices();
             
-            // Try to find female voices first
-            const femaleVoice = voices.find(voice => 
-                voice.lang.startsWith('en') && 
-                (voice.name.toLowerCase().includes('female') || 
-                 voice.name.toLowerCase().includes('zira') ||
-                 voice.name.toLowerCase().includes('susan') ||
-                 voice.name.toLowerCase().includes('karen') ||
-                 voice.name.toLowerCase().includes('samantha') ||
-                 voice.name.toLowerCase().includes('fiona'))
+            // Try to find Molly voice first
+            const mollyVoice = voices.find(voice => 
+                voice.name.toLowerCase().includes('molly')
             );
             
-            // If no female voice, try any good English voice
+            // Fallback to other female voices if Molly not available
+            const femaleVoice = voices.find(voice => 
+                voice.lang.startsWith('en') && 
+                (voice.name.toLowerCase().includes('susan') ||
+                 voice.name.toLowerCase().includes('zira') ||
+                 voice.name.toLowerCase().includes('karen') ||
+                 voice.name.toLowerCase().includes('samantha') ||
+                 voice.name.toLowerCase().includes('fiona') ||
+                 voice.name.toLowerCase().includes('female'))
+            );
+            
+            // Final fallback to any good English voice
             const anyGoodVoice = voices.find(voice => 
                 voice.lang.startsWith('en') && 
                 (voice.name.includes('Google') || voice.name.includes('Microsoft'))
             );
             
-            if (femaleVoice) {
+            if (mollyVoice) {
+                utterance.voice = mollyVoice;
+                console.log('Using Molly voice:', mollyVoice.name);
+            } else if (femaleVoice) {
                 utterance.voice = femaleVoice;
+                console.log('Molly not found, using female voice:', femaleVoice.name);
             } else if (anyGoodVoice) {
                 utterance.voice = anyGoodVoice;
+                console.log('No female voice found, using:', anyGoodVoice.name);
+            } else {
+                console.log('Using default system voice');
             }
-            
-            console.log('Using voice:', utterance.voice ? utterance.voice.name : 'default');
 
             utterance.onstart = () => {
                 console.log('Speech started');
