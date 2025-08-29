@@ -66,16 +66,33 @@ document.addEventListener('DOMContentLoaded', () => {
             utterance.pitch = 1.0;
             utterance.volume = 0.8;
             
-            // Try to use a good English voice
+            // Try to use a specific voice (prioritize female voices)
             const voices = window.speechSynthesis.getVoices();
-            const englishVoice = voices.find(voice => 
+            
+            // Try to find female voices first
+            const femaleVoice = voices.find(voice => 
                 voice.lang.startsWith('en') && 
-                (voice.name.includes('Google') || voice.name.includes('Microsoft') || voice.name.includes('Alex'))
+                (voice.name.toLowerCase().includes('female') || 
+                 voice.name.toLowerCase().includes('zira') ||
+                 voice.name.toLowerCase().includes('susan') ||
+                 voice.name.toLowerCase().includes('karen') ||
+                 voice.name.toLowerCase().includes('samantha') ||
+                 voice.name.toLowerCase().includes('fiona'))
             );
             
-            if (englishVoice) {
-                utterance.voice = englishVoice;
+            // If no female voice, try any good English voice
+            const anyGoodVoice = voices.find(voice => 
+                voice.lang.startsWith('en') && 
+                (voice.name.includes('Google') || voice.name.includes('Microsoft'))
+            );
+            
+            if (femaleVoice) {
+                utterance.voice = femaleVoice;
+            } else if (anyGoodVoice) {
+                utterance.voice = anyGoodVoice;
             }
+            
+            console.log('Using voice:', utterance.voice ? utterance.voice.name : 'default');
 
             utterance.onstart = () => {
                 console.log('Speech started');
@@ -244,6 +261,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.speechSynthesis.getVoices().length === 0) {
         window.speechSynthesis.addEventListener('voiceschanged', () => {
             console.log('Speech voices loaded:', window.speechSynthesis.getVoices().length);
+            // Log all available voices for debugging
+            window.speechSynthesis.getVoices().forEach((voice, index) => {
+                console.log(`${index}: ${voice.name} (${voice.lang}) - ${voice.gender || 'unknown gender'}`);
+            });
+        });
+    } else {
+        // Log voices if already loaded
+        window.speechSynthesis.getVoices().forEach((voice, index) => {
+            console.log(`${index}: ${voice.name} (${voice.lang}) - ${voice.gender || 'unknown gender'}`);
         });
     }
 });
