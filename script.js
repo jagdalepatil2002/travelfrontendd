@@ -9,8 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalLoader = document.getElementById('modal-loader');
     const closeButton = document.querySelector('.close-button');
     const listenButton = document.getElementById('listen-button');
+    const placeDescription = document.getElementById('place-description');
 
-    const API_BASE_URL = 'https://backendtravel-pgzt.onrender.com';
+    const API_BASE_URL = 'http://127.0.0.1:5000';
+
+    let isPlaying = false;
+    let currentAudio;
 
     // --- Event Listeners ---
 
@@ -23,20 +27,193 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeButton.addEventListener('click', () => {
         modal.style.display = 'none';
+        stopAudio();
     });
 
     window.addEventListener('click', (event) => {
         if (event.target == modal) {
             modal.style.display = 'none';
+            stopAudio();
         }
     });
 
     listenButton.addEventListener('click', () => {
-        // Placeholder for future text-to-speech functionality
-        alert('Text-to-speech feature coming soon!');
+        if (isPlaying) {
+            stopAudio();
+        } else {
+            const textToSpeak = placeDescription.innerText;
+            playAudio(textToSpeak);
+        }
     });
 
-    // --- Functions ---
+    // --- Audio Functions ---
+
+    async function playAudio(text) {
+        if (!text) return;
+
+        setListenButtonState('loading');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/text-to-speech`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to fetch audio.');
+            }
+
+            // Check if response is JSON (URL) or binary data
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                // Response contains audio URL
+                const data = await response.json();
+                
+                if (data.audio_url) {
+                    console.log('Playing audio from URL:', data.audio_url);
+                    stopAudio(); // Stop any previous audio
+                    
+                    currentAudio = new Audio(data.audio_url);
+                    
+                    // Set up event listeners before playing
+                    currentAudio.onloadstart = () => {
+                        console.log('Audio loading started');
+                    };
+                    
+                    currentAudio.oncanplay = () => {
+                        console.log('Audio can start playing');
+                        setListenButtonState('playing');
+                    };
+                    
+                    currentAudio.onended = () => {
+                        console.log('Audio playback ended');
+                        if (isPlaying) {
+                            stopAudio();
+                        }
+                    };
+                    
+                    currentAudio.onerror = (e) => {
+                        console.error('Error playing audio from URL:', e);
+                        console.error('Audio error details:', currentAudio.error);
+                        alert('Failed to play audio. The audio file might be temporarily unavailable.');
+                        stopAudio();
+                    };
+                    
+                    currentAudio.onloadeddata = () => {
+                        console.log('Audio data loaded successfully');
+                    };
+                    
+                    // Start loading the audio
+                    currentAudio.load();
+                    isPlaying = true;
+                    
+                    // Attempt to play
+                    try {
+                        await currentAudio.play();
+                        console.log('Audio playback started successfully');
+                    } catch (playError) {
+                        console.error('Play promise rejected:', playError);
+                        // Some browsers require user interaction before playing
+                        if (playError.name === 'NotAllowedError') {
+                            alert('Please click the Listen button again to start audio playback.');
+                        }
+                        stopAudio();
+                    }
+                } else {
+                    throw new Error('No audio URL received from server.');
+                }
+                
+            } else {
+                // Response contains raw audio data (fallback for direct bytes)
+                console.log('Handling raw audio data');
+                const audioData = await response.arrayBuffer();
+                
+                if (audioContext) {
+                    await audioContext.close();
+                }
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioSource = audioContext.createBufferSource();
+
+                const audioBuffer = await audioContext.decodeAudioData(audioData);
+                
+                audioSource.buffer = audioBuffer;
+                audioSource.connect(audioContext.destination);
+                audioSource.start(0);
+                isPlaying = true;
+                setListenButtonState('playing');
+
+                audioSource.onended = () => {
+                    if (isPlaying) {
+                        stopAudio();
+                    }
+                };
+            }
+
+        } catch (error) {
+            console.error('Error playing audio:', error);
+            alert(`Sorry, could not play the audio. ${error.message}`);
+            stopAudio();
+        }
+    }
+
+    function stopAudio() {
+        // Stop HTML5 Audio
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio.onended = null;
+            currentAudio.onerror = null;
+            currentAudio.oncanplay = null;
+            currentAudio.onloadstart = null;
+            currentAudio.onloadeddata = null;
+            currentAudio = null;
+            console.log('Audio stopped and cleaned up');
+        }
+        
+        // Stop Web Audio API (fallback)
+        if (typeof audioSource !== 'undefined' && audioSource) {
+            audioSource.onended = null;
+            try {
+                audioSource.stop();
+            } catch (e) {
+                // Audio source might already be stopped
+            }
+            audioSource = null;
+        }
+        if (typeof audioContext !== 'undefined' && audioContext) {
+            audioContext.close().then(() => audioContext = null);
+        }
+        
+        isPlaying = false;
+        setListenButtonState('stopped');
+    }
+
+    function setListenButtonState(state) {
+        const listenIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-volume-2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+        const stopIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-square"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
+        
+        switch (state) {
+            case 'loading':
+                listenButton.innerHTML = 'Loading...';
+                listenButton.disabled = true;
+                break;
+            case 'playing':
+                listenButton.innerHTML = `${stopIcon} Stop`;
+                listenButton.disabled = false;
+                break;
+            case 'stopped':
+            default:
+                listenButton.innerHTML = `${listenIcon} Listen`;
+                listenButton.disabled = false;
+                break;
+        }
+    }
+
+    // --- Search Functions ---
 
     async function searchForPlaces() {
         const location = locationInput.value.trim();
@@ -121,16 +298,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`Place Details call used ${data.token_count} tokens.`);
             }
 
-            // Simple markdown-like formatting for the output
             const formattedDescription = data.description
                 .replace(/\*\*(.*?)\*\*/g, '<h2>$1</h2>') // Bold sections as subheadings
                 .replace(/\n/g, '<br>'); // Newlines to line breaks
 
-            modalBody.innerHTML = `<p>${formattedDescription}</p>`;
+            placeDescription.innerHTML = formattedDescription;
+            listenButton.style.display = 'block'; // Show the listen button
 
         } catch (error) {
             console.error('Error fetching place details:', error);
-            modalBody.innerHTML = '<p class="error-message">Could not load details. Please try again later.</p>';
+            placeDescription.innerHTML = '<p class="error-message">Could not load details. Please try again later.</p>';
+            listenButton.style.display = 'none'; // Hide on error
         } finally {
             modalLoader.style.display = 'none';
         }
