@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const listenButton = document.getElementById('listen-button');
     const placeDescription = document.getElementById('place-description');
 
-    const API_BASE_URL = 'https://backendtravel-pgzt.onrender.com/';
+    const API_BASE_URL = 'http://127.0.0.1:5000';
 
     let isPlaying = false;
     let currentAudio;
