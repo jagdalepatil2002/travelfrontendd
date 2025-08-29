@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_BASE_URL = 'https://backendtravel-pgzt.onrender.com';
 
     let isPlaying = false;
-    let currentAudio;
 
     // --- Event Listeners ---
 
@@ -46,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Audio Functions ---
+    // --- Audio Functions (UPDATED TO USE WEB SPEECH API) ---
 
     async function playAudio(text) {
         if (!text) return;
@@ -54,142 +53,69 @@ document.addEventListener('DOMContentLoaded', () => {
         setListenButtonState('loading');
         
         try {
-            const response = await fetch(`${API_BASE_URL}/api/text-to-speech`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to fetch audio.');
+            // Stop any current speech
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
             }
 
-            // Check if response is JSON (URL) or binary data
-            const contentType = response.headers.get('content-type');
+            // Create speech synthesis utterance
+            const utterance = new SpeechSynthesisUtterance(text);
             
-            if (contentType && contentType.includes('application/json')) {
-                // Response contains audio URL
-                const data = await response.json();
-                
-                if (data.audio_url) {
-                    console.log('Playing audio from URL:', data.audio_url);
-                    stopAudio(); // Stop any previous audio
-                    
-                    currentAudio = new Audio(data.audio_url);
-                    
-                    // Set up event listeners before playing
-                    currentAudio.onloadstart = () => {
-                        console.log('Audio loading started');
-                    };
-                    
-                    currentAudio.oncanplay = () => {
-                        console.log('Audio can start playing');
-                        setListenButtonState('playing');
-                    };
-                    
-                    currentAudio.onended = () => {
-                        console.log('Audio playback ended');
-                        if (isPlaying) {
-                            stopAudio();
-                        }
-                    };
-                    
-                    currentAudio.onerror = (e) => {
-                        console.error('Error playing audio from URL:', e);
-                        console.error('Audio error details:', currentAudio.error);
-                        alert('Failed to play audio. The audio file might be temporarily unavailable.');
-                        stopAudio();
-                    };
-                    
-                    currentAudio.onloadeddata = () => {
-                        console.log('Audio data loaded successfully');
-                    };
-                    
-                    // Start loading the audio
-                    currentAudio.load();
-                    isPlaying = true;
-                    
-                    // Attempt to play
-                    try {
-                        await currentAudio.play();
-                        console.log('Audio playback started successfully');
-                    } catch (playError) {
-                        console.error('Play promise rejected:', playError);
-                        // Some browsers require user interaction before playing
-                        if (playError.name === 'NotAllowedError') {
-                            alert('Please click the Listen button again to start audio playback.');
-                        }
-                        stopAudio();
-                    }
-                } else {
-                    throw new Error('No audio URL received from server.');
-                }
-                
-            } else {
-                // Response contains raw audio data (fallback for direct bytes)
-                console.log('Handling raw audio data');
-                const audioData = await response.arrayBuffer();
-                
-                if (audioContext) {
-                    await audioContext.close();
-                }
-                
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                audioSource = audioContext.createBufferSource();
+            // Configure voice settings
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 0.8;
+            
+            // Try to use a good English voice
+            const voices = window.speechSynthesis.getVoices();
+            const englishVoice = voices.find(voice => 
+                voice.lang.startsWith('en') && 
+                (voice.name.includes('Google') || voice.name.includes('Microsoft') || voice.name.includes('Alex'))
+            );
+            
+            if (englishVoice) {
+                utterance.voice = englishVoice;
+            }
 
-                const audioBuffer = await audioContext.decodeAudioData(audioData);
-                
-                audioSource.buffer = audioBuffer;
-                audioSource.connect(audioContext.destination);
-                audioSource.start(0);
+            utterance.onstart = () => {
+                console.log('Speech started');
                 isPlaying = true;
                 setListenButtonState('playing');
+            };
 
-                audioSource.onended = () => {
-                    if (isPlaying) {
-                        stopAudio();
-                    }
-                };
-            }
+            utterance.onend = () => {
+                console.log('Speech ended');
+                isPlaying = false;
+                setListenButtonState('stopped');
+            };
+
+            utterance.onerror = (event) => {
+                console.error('Speech error:', event.error);
+                isPlaying = false;
+                setListenButtonState('stopped');
+                alert('Speech synthesis failed. Please try again.');
+            };
+
+            // Start speaking - NO BACKEND CALL!
+            window.speechSynthesis.speak(utterance);
 
         } catch (error) {
-            console.error('Error playing audio:', error);
-            alert(`Sorry, could not play the audio. ${error.message}`);
-            stopAudio();
+            console.error('Speech error:', error);
+            isPlaying = false;
+            setListenButtonState('stopped');
+            alert('Speech not supported in this browser.');
         }
     }
 
     function stopAudio() {
-        // Stop HTML5 Audio
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-            currentAudio.onended = null;
-            currentAudio.onerror = null;
-            currentAudio.oncanplay = null;
-            currentAudio.onloadstart = null;
-            currentAudio.onloadeddata = null;
-            currentAudio = null;
-            console.log('Audio stopped and cleaned up');
-        }
-        
-        // Stop Web Audio API (fallback)
-        if (typeof audioSource !== 'undefined' && audioSource) {
-            audioSource.onended = null;
-            try {
-                audioSource.stop();
-            } catch (e) {
-                // Audio source might already be stopped
-            }
-            audioSource = null;
-        }
-        if (typeof audioContext !== 'undefined' && audioContext) {
-            audioContext.close().then(() => audioContext = null);
+        // Stop speech synthesis
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
         }
         
         isPlaying = false;
         setListenButtonState('stopped');
+        console.log('Speech stopped');
     }
 
     function setListenButtonState(state) {
@@ -312,5 +238,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             modalLoader.style.display = 'none';
         }
+    }
+
+    // Initialize speech synthesis voices
+    if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.addEventListener('voiceschanged', () => {
+            console.log('Speech voices loaded:', window.speechSynthesis.getVoices().length);
+        });
     }
 });
