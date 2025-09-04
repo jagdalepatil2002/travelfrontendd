@@ -22,20 +22,42 @@ def get_detailed_description_prompt(place_name):
     This is intended to be read aloud.
     """
     return f"""
-    You are a friendly, enthusiastic, and knowledgeable tour guide.
-    A tourist is asking for a detailed guide about "{place_name}".
+    You are a world-class travel writer and guide. Write an extremely detailed, comprehensive, and engaging travel guide for "{place_name}" in 8 sections, each clearly marked with a markdown heading (e.g., ## Introduction, ## History and Significance, etc.). Each section should be thorough, and the total length should be at least 10,000 words.
     Generate a captivating and comprehensive travel guide for them, written in a conversational and engaging tone, as if you are speaking to them directly. The total length should be between 800 and 1000 words.
 
-    Your response must be a single block of text, perfect for a text-to-speech service.
+    Your response must be a single block of text with words ranging from 5000 to 1000, perfect for a text-to-speech service.
 
     Structure your guide like this:
     1.  **Introduction:** Start with a warm welcome. Greet the traveler and introduce "{place_name}" in an exciting way.
     2.  **History and Significance:** Briefly share the story behind the place. Make it interesting, like telling a story, not like a dry history lesson.
     3.  **What to See and Do:** Describe the main highlights. What are the must-see things inside or around? What activities can they do? Use vivid language.
-    4.  **Best Photo Spots:** Tell them where they can get the best photos. Be specific, like "For a stunning sunset shot, stand on the western corner...".
-    5.  **Local Cuisine and Food:** Recommend nearby food or specific dishes they should try that are famous in the area.
-    6.  **Best Time to Visit:** Advise on the best season, day of the week, or time of day to visit to avoid crowds or to get the best experience.
-    7.  **Parting Tip:** End with a friendly closing remark or a final insider tip to make their visit memorable.
+    4.  **Fascinating Facts:** Fun, quirky, or little-known facts that surprise travelers.                                                                                                               
+    5.  **Best Photo Spots:** Tell them where they can get the best photos. Be specific, like "For a stunning sunset shot, stand on the western corner...".
+    6.  **Local Cuisine and Food:** Recommend nearby food or specific dishes they should try that are famous in the area.
+    7.  **Best Time to Visit:** Advise on the best season, day of the week, or time of day to visit to avoid crowds or to get the best experience.
+    8.  **Parting Tip:** End with a friendly closing remark or a final insider tip to make their visit memorable.
 
+    Do not include any text outside these sections. Each section should be long, detailed, and engaging, as if for a book chapter. Return only the markdown-formatted guide.
     Remember, speak directly to the user (e.g., "You'll want to...", "Imagine yourself..."). Your tone should be cheerful and passionate about the location.
+    """
+
+def get_regenerate_section_prompt(place_name, section_title, current_text, user_instruction=None):
+    """
+    Creates a prompt for regenerating a specific section of a travel guide, with optional user instruction.
+    """
+    clean_title = section_title.replace('##', '').strip()
+    instruction_text = f"\n\nThe user has requested the following changes or focus: {user_instruction}" if user_instruction else ""
+    return f"""
+    You are a world-class travel writer and guide. You are helping to improve a specific section of a travel guide for \"{place_name}\".
+    The section is titled \"{clean_title}\" and currently contains the following text:
+    {current_text}
+    {instruction_text}
+    Please rewrite this section with the following improvements:
+    1. Keep the same conversational, friendly tone as if speaking directly to the traveler
+    2. Add more vivid details and specific recommendations 
+    3. Make it more engaging and informative
+    4. Maintain the appropriate length (similar to the current text)
+    5. Ensure the content remains factually accurate about {place_name}
+    Return ONLY the new content for this section, without any additional formatting or notes.
+    Do not include the section title or any markdown heading in your response.
     """

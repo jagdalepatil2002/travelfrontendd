@@ -11,8 +11,7 @@ import prompts
 # --- Initialization ---
 load_dotenv()
 app = Flask(__name__)
-CORS(app) # Allows frontend to call the backend
-
+CORS(app, resources={r"/*": {"origins": "*"}})
 # Configure Gemini API
 try:
     genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -20,6 +19,15 @@ try:
 except Exception as e:
     print(f"Error configuring Gemini API: {e}")
     model = None
+
+# --- CORS Helper Function ---
+def handle_preflight():
+    """Handle CORS preflight requests by returning appropriate headers."""
+    response = jsonify({})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    return response
 
 # --- Helper Functions ---
 def get_wikipedia_image_url(place_name):
@@ -53,12 +61,15 @@ def get_wikipedia_image_url(place_name):
     return None # Return None if no image is found or an error occurs
 
 # --- API Endpoints ---
-@app.route('/search-places', methods=['POST'])
+@app.route('/search-places', methods=['POST', 'OPTIONS'])
 def search_places():
     """
     Endpoint to get a list of 10 famous places.
     Checks the database for a cached search before calling the LLM.
     """
+    if request.method == 'OPTIONS':
+        return handle_preflight()
+        
     if not model:
         return jsonify({"error": "AI Model not configured"}), 500
 
@@ -114,12 +125,15 @@ def search_places():
         print(f"Error during place search: {e}")
         return jsonify({"error": "Failed to fetch places from AI model."}), 500
 
-@app.route('/place-details', methods=['POST'])
+@app.route('/place-details', methods=['POST', 'OPTIONS'])
 def get_place_details():
     """
     Endpoint to get detailed, conversational info about a single place.
     Checks the database first before making the second, more expensive LLM call.
     """
+    if request.method == 'OPTIONS':
+        return handle_preflight()
+        
     if not model:
         return jsonify({"error": "AI Model not configured"}), 500
 
@@ -151,6 +165,89 @@ def get_place_details():
     except Exception as e:
         print(f"Error during detail generation: {e}")
         return jsonify({"error": "Failed to generate details from AI model."}), 500
+
+# --- Regenerate Section Endpoint ---
+@app.route('/regenerate-section', methods=['POST', 'OPTIONS'])
+def regenerate_section():
+    # Handle preflight CORS requests for the regenerate-section endpoint
+    if request.method == 'OPTIONS':
+        return handle_preflight()
+        
+    print("\n--- REGENERATE SECTION CALLED ---")
+    if not model:
+        print("Error: AI Model not configured")
+        return jsonify({"error": "AI Model not configured"}), 500
+    
+    print("Parsing request data...")
+    data = request.get_json()
+    print(f"Request data: {data}")
+    
+    place_name = data.get('place_name')
+    section_title = data.get('section_title')
+    current_text = data.get('current_text')
+    user_instruction = data.get('user_instruction', '').strip()
+
+    print(f"Place name: {place_name}")
+    print(f"Section title: {section_title}")
+    print(f"Current text length: {len(current_text) if current_text else 0}")
+    print(f"User instruction: {user_instruction}")
+
+    if not (place_name and section_title and current_text):
+        missing = []
+        if not place_name: missing.append('place_name')
+        if not section_title: missing.append('section_title')
+        if not current_text: missing.append('current_text')
+        print(f"Error: Missing required fields: {', '.join(missing)}")
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    print("Generating prompt...")
+    prompt = prompts.get_regenerate_section_prompt(place_name, section_title, current_text, user_instruction)
+    print(f"Prompt generated (length: {len(prompt)})")
+
+    try:
+        print("Calling Gemini API...")
+        response = model.generate_content(prompt)
+        regenerated_content = response.text.strip()
+        print(f"Response received. Content length: {len(regenerated_content)}")
+        print("First 100 chars:", regenerated_content[:100])
+        return jsonify({"regenerated_content": regenerated_content})
+    except Exception as e:
+        print(f"Error during section regeneration: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to regenerate section: {str(e)}"}), 500
+
+# --- Save Detailed Description Endpoint ---
+@app.route('/save-detailed-description', methods=['POST', 'OPTIONS'])
+def save_detailed_description():
+    # Handle preflight CORS requests for the save-detailed-description endpoint
+    if request.method == 'OPTIONS':
+        return handle_preflight()
+        
+    print("\n--- SAVE DETAILED DESCRIPTION CALLED ---")
+    data = request.get_json()
+    place_name = data.get('place_name')
+    description = data.get('description')
+    
+    print(f"Place name: {place_name}")
+    print(f"Description length: {len(description) if description else 0}")
+    
+    if not (place_name and description):
+        missing = []
+        if not place_name: missing.append('place_name')
+        if not description: missing.append('description')
+        print(f"Error: Missing required fields: {', '.join(missing)}")
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+    
+    try:
+        database.save_place_details(place_name, description)
+        print("Successfully saved to database")
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error saving detailed description: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to save description: {str(e)}"}), 500
 
 # --- Run Application ---
 if __name__ == '__main__':

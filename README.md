@@ -1,68 +1,68 @@
-# AI Travel Planner
+# Travel Guide Backend (Production Ready)
 
-This is a web application that acts as an AI-powered travel guide. Users can search for a location (city or landmark) and receive a curated list of the top 10 tourist attractions with images and short descriptions. They can then click on any attraction to get a full, conversational, and detailed guide.
-
-The project is built with a Python/Flask backend and a simple HTML/CSS/JS frontend. It uses the Gemini API for content generation and caches results in a PostgreSQL database to optimize cost and performance.
+## Overview
+This is a Flask-based backend for a travel guide app using Gemini AI and PostgreSQL. It is ready for production and deployment.
 
 ## Features
+- Search for famous places (AI-powered, cached)
+- Get detailed, conversational travel guides
+- Regenerate guide sections
+- CORS enabled for frontend
+- Wikipedia image fetching
 
--   **AI-Powered Content**: Uses Google's Gemini model to generate travel content.
--   **Two-Step Generation**: Fetches a list of places first (low cost), then generates details on demand (higher cost), saving API tokens.
--   **Database Caching**: Caches both search results and detailed descriptions to minimize redundant API calls.
--   **Dynamic Image Fetching**: Retrieves images from the Wikipedia API.
--   **Clean, Responsive UI**: Simple and modern user interface that works on different screen sizes.
+## Setup Instructions
 
-## Setup and Installation
-
-Follow these steps to set up and run the project locally.
-
-### 1. Prerequisites
-
--   Python 3.x
--   `pip` for package management
--   A PostgreSQL database
-
-### 2. Clone the Repository
-
-```bash
-git clone <your-repository-url>
-cd TravelBackend
+### 1. Clone the Repository
+```
+git clone <your-backend-repo-url>
+cd <repo-folder>
 ```
 
+### 2. Python Environment
+- Use Python 3.9+
+- (Recommended) Create a virtual environment:
+    ```
+    python -m venv venv
+    venv\Scripts\activate  # On Windows
+    source venv/bin/activate  # On Mac/Linux
+    ```
+
 ### 3. Install Dependencies
-
-Install all the required Python packages using the `requirements.txt` file.
-
-```bash
+```
 pip install -r requirements.txt
 ```
 
-### 4. Set Up Environment Variables
-
-Create a file named `.env` in the root of the project folder and add your secret keys.
-
-```env
-# .env file
-GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE"
-DATABASE_URL="YOUR_POSTGRESQL_CONNECTION_URL_HERE"
+### 4. Environment Variables
+Create a `.env` file in the root directory with:
+```
+GEMINI_API_KEY=your_gemini_api_key
+DATABASE_URL=your_postgres_connection_url
 ```
 
-### 5. Initialize the Database
+### 5. Database Setup
+- The app will auto-create tables on first run if your database is accessible.
 
-Run the `database.py` script once to create and configure the necessary tables in your database.
-
-```bash
-python database.py
+### 6. Run the Server
 ```
+python app.py
+```
+- The server runs on port 5000 by default.
 
-## Running the Application
+## Deployment
+- Use a production WSGI server (e.g., Gunicorn, uWSGI) for deployment.
+- Set `debug=False` in `app.py` for production.
+- Use environment variables for all secrets.
 
-1.  **Start the Backend Server**:
-    ```bash
-    python app.py
-    ```
-    The server will start on `http://127.0.0.1:5000`.
+## Endpoints
+- `POST /search-places` — Get 10 famous places for a location
+- `POST /place-details` — Get detailed info for a place
+- `POST /regenerate-section` — Regenerate a section of a guide
+- `POST /save-detailed-description` — Save a detailed description
 
-2.  **Launch the Frontend**:
-    -   Navigate to the project folder in your file explorer.
-    -   Double-click the `index.html` file to open it in your web browser.
+## Notes
+- Ensure your database and Gemini API credentials are correct.
+- Frontend should handle CORS and use the correct endpoints.
+
+---
+
+For any issues, open an issue or contact the maintainer.

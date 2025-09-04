@@ -15,13 +15,23 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # Alter existing places table to add new columns and make detailed_description nullable
+    # Create places table if it does not exist
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS places (
+            place_name VARCHAR(255) PRIMARY KEY,
+            short_description TEXT,
+            image_url VARCHAR(1024),
+            detailed_description TEXT
+        );
+    ''')
+
+    # Now safe to run ALTER commands
     cur.execute('''
         ALTER TABLE places ADD COLUMN IF NOT EXISTS short_description TEXT;
         ALTER TABLE places ADD COLUMN IF NOT EXISTS image_url VARCHAR(1024);
         ALTER TABLE places ALTER COLUMN detailed_description DROP NOT NULL;
     ''')
-    
+
     # Create a new table to cache search results
     cur.execute('''
         CREATE TABLE IF NOT EXISTS search_cache (
